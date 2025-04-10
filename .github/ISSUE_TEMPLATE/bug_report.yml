@@ -1,0 +1,93 @@
+name: Report a Bug
+description: Report a bug or issue in the Manastik App
+title: "[Bug]: "
+type: bug
+assignees: []
+
+body:
+  - type: input
+    id: app_version
+    attributes:
+      label: "App Version"
+      description: "Enter the app version you are using"
+      placeholder: "e.g., v2.0.3+123"
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: "Environment"
+      description: "Select the environment where the issue occurred"
+      options:
+        - DEV
+        - TEST
+        - STAGE
+        - PROD
+    validations:
+      required: true
+
+  - type: textarea
+    id: title
+    attributes:
+      label: "Description"
+      description: "Provide a short and clear description of the issue"
+
+  - type: textarea
+    id: repro_steps
+    attributes:
+      label: "Repro Steps"
+      description: "List the steps to reproduce the issue. Please keep in mind that it should be descriptive enough for the developer to reproduce the same issue which you are facing."
+      placeholder: |
+        1. Open the app
+        2. Navigate to XYZ
+        3. Click on ABC
+        4. Observe the issue
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_result
+    attributes:
+      label: "Expected Result"
+      description: "Describe what you expected to happen if the issue did not exist."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_result
+    attributes:
+      label: "Actual Result"
+      description: "Describe what actually happened"
+    validations:
+      required: true
+
+  - type: input
+    id: client_system
+    attributes:
+      label: "Client + System Settings"
+      description: "Provide details of your device and OS version"
+      placeholder: "e.g., Poco M3 Pro 5G; Android 13; MIUI 14"
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: "### Additional Information (Optional)"
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: "📷 Screenshots & Recordings"
+      description: "Expand to attach screenshots or recordings if applicable"
+      placeholder: "Drag and drop or paste images here"
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "📜 Logs"
+      description: "Expand to attach logs if available"
+      placeholder: "Paste logs here"
+      render: shell
+    validations:
+      required: false
