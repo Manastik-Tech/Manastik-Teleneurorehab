@@ -5,73 +5,53 @@ on:
     types: [assigned]
 
 jobs:
-  extract_issue:
-    name: Extract Issue Info
+  # Create the issue in the private repository
+  create-private-issue:
     runs-on: ubuntu-latest
     outputs:
-      title: ${{ steps.extract.outputs.title }}
-      body: ${{ steps.extract.outputs.body }}
-      labels: ${{ steps.extract.outputs.labels }}
-      assignee: ${{ steps.extract.outputs.assignee }}
-      number: ${{ steps.extract.outputs.number }}
-      url: ${{ steps.extract.outputs.url }}
+      new_issue_number: ${{ steps.create-issue.outputs.issue-number }}
+      new_issue_url: ${{ steps.create-issue.outputs.issue-html-url }}
+    
     steps:
-      - name: Extract info from issue
-        id: extract
+      - name: Create issue body file
         run: |
-          echo "title=${{ github.event.issue.title }}" >> $GITHUB_OUTPUT
-          echo "assignee=${{ github.event.assignee.login }}" >> $GITHUB_OUTPUT
-          echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
-          echo "url=${{ github.event.issue.html_url }}" >> $GITHUB_OUTPUT
-
-          labels=$(jq -c '[.[] | .name]' <<< '${{ toJson(github.event.issue.labels) }}')
-          echo "labels=$labels" >> $GITHUB_OUTPUT
-
-          echo "body<<EOF" >> $GITHUB_OUTPUT
-          echo "${{ github.event.issue.body }}" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-  create_in_private:
-    name: Create Issue in Private Repo
-    needs: extract_issue
-    runs-on: ubuntu-latest
-    outputs:
-      issue-number: ${{ steps.create.outputs.issue-number }}
-      html-url: ${{ steps.create.outputs.html-url }}
-    steps:
+          echo "${{ github.event.issue.body }}" > /tmp/issue-body.md
+          echo "" >> /tmp/issue-body.md
+          echo "_Copied from [Manastik-Tech/Manastik-Teleneurorehab#${{ github.event.issue.number }}](https://github.com/Manastik-Tech/Manastik-Teleneurorehab/issues/${{ github.event.issue.number }})_" >> /tmp/issue-body.md
+      
       - name: Create issue in private repo
-        id: create
-        uses: peter-evans/create-issue@v5
+        id: create-issue
+        uses: peter-evans/create-issue-from-file@v4
         with:
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ secrets.GH_PAT }}
           repository: Manastik-Tech/dementia-app-v2
-          title: ${{ needs.extract_issue.outputs.title }}
-          body: ${{ needs.extract_issue.outputs.body }}
-          labels: ${{ needs.extract_issue.outputs.labels }}
-          assignees: ${{ needs.extract_issue.outputs.assignee }}
+          title: ${{ github.event.issue.title }}
+          content-filepath: /tmp/issue-body.md
+          labels: ${{ join(github.event.issue.labels.*.name, ',') }}
+          assignees: ${{ github.event.issue.assignee.login }}
 
-  comment_and_close:
-    name: Comment, Label, and Close Original
-    needs: [extract_issue, create_in_private]
+  # Update and close the original issue
+  update-original-issue:
     runs-on: ubuntu-latest
+    needs: create-private-issue
+    
     steps:
       - name: Comment on original issue
         uses: peter-evans/create-or-update-comment@v4
         with:
-          token: ${{ secrets.GH_TOKEN }}
-          issue-number: ${{ needs.extract_issue.outputs.number }}
-          body: |
-            Assigned to ${{ needs.extract_issue.outputs.assignee }} - [Issue #${{ needs.create_in_private.outputs.issue-number }}](${{ needs.create_in_private.outputs.html-url }})
-
-      - name: Add "assigned" label
-        uses: actions-ecosystem/action-add-labels@v1
+          token: ${{ secrets.GH_PAT }}
+          issue-number: ${{ github.event.issue.number }}
+          body: "Assigned to ${{ github.event.issue.assignee.login }} - [Issue #${{ needs.create-private-issue.outputs.new_issue_number }}](${{ needs.create-private-issue.outputs.new_issue_url }})"
+      
+      - name: Add label to original issue
+        uses: andymckay/labeler@master
         with:
-          github_token: ${{ secrets.GH_TOKEN }}
-          labels: assigned
-          issue_number: ${{ needs.extract_issue.outputs.number }}
-
+          add-labels: "assigned"
+          repo-token: ${{ secrets.GH_PAT }}
+      
       - name: Close original issue
         uses: peter-evans/close-issue@v2
         with:
-          token: ${{ secrets.GH_TOKEN }}
-          issue-number: ${{ needs.extract_issue.outputs.number }}
+          token: ${{ secrets.GH_PAT }}
+          issue-number: ${{ github.event.issue.number }}
+          comment: false
