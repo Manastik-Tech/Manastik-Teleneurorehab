@@ -20,11 +20,16 @@ jobs:
         id: extract
         run: |
           echo "title=${{ github.event.issue.title }}" >> $GITHUB_OUTPUT
-          echo "body=${{ github.event.issue.body }}" >> $GITHUB_OUTPUT
-          echo "labels=$(jq -c '[.[] | .name]' <<< '${{ toJson(github.event.issue.labels) }}')" >> $GITHUB_OUTPUT
           echo "assignee=${{ github.event.assignee.login }}" >> $GITHUB_OUTPUT
           echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
           echo "url=${{ github.event.issue.html_url }}" >> $GITHUB_OUTPUT
+
+          labels=$(jq -c '[.[] | .name]' <<< '${{ toJson(github.event.issue.labels) }}')
+          echo "labels=$labels" >> $GITHUB_OUTPUT
+
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "${{ github.event.issue.body }}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
   create_in_private:
     name: Create Issue in Private Repo
