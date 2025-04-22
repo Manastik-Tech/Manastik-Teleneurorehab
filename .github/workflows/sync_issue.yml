@@ -16,87 +16,57 @@ jobs:
       number: ${{ steps.extract.outputs.number }}
       url: ${{ steps.extract.outputs.url }}
     steps:
-      - name: Extract issue details
+      - name: Extract info from issue
         id: extract
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GH_TOKEN }}
-          script: |
-            const issue = context.payload.issue;
-            const assignee = context.payload.assignee.login;
-            const labels = issue.labels.map(l => l.name);
-            return {
-              title: issue.title,
-              body: issue.body,
-              labels: JSON.stringify(labels),
-              assignee: assignee,
-              number: issue.number,
-              url: issue.html_url
-            };
+        run: |
+          echo "title=${{ github.event.issue.title }}" >> $GITHUB_OUTPUT
+          echo "body=${{ github.event.issue.body }}" >> $GITHUB_OUTPUT
+          echo "labels=$(jq -c '[.[] | .name]' <<< '${{ toJson(github.event.issue.labels) }}')" >> $GITHUB_OUTPUT
+          echo "assignee=${{ github.event.assignee.login }}" >> $GITHUB_OUTPUT
+          echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+          echo "url=${{ github.event.issue.html_url }}" >> $GITHUB_OUTPUT
 
   create_in_private:
     name: Create Issue in Private Repo
     needs: extract_issue
     runs-on: ubuntu-latest
     outputs:
-      number: ${{ steps.create.outputs.number }}
-      html_url: ${{ steps.create.outputs.html_url }}
+      issue-number: ${{ steps.create.outputs.issue-number }}
+      html-url: ${{ steps.create.outputs.html-url }}
     steps:
-      - name: Create issue
+      - name: Create issue in private repo
         id: create
-        uses: actions/github-script@v7
+        uses: peter-evans/create-issue@v5
         with:
-          github-token: ${{ secrets.GH_TOKEN }}
-          script: |
-            const labels = JSON.parse(`${{ needs.extract_issue.outputs.labels }}`);
-            const { data: newIssue } = await github.rest.issues.create({
-              owner: 'Manastik-Tech',
-              repo: 'dementia-app-v2',
-              title: `${{ needs.extract_issue.outputs.title }}`,
-              body: `${{ needs.extract_issue.outputs.body }}`,
-              labels: labels,
-              assignees: [`${{ needs.extract_issue.outputs.assignee }}`]
-            });
-            return {
-              number: newIssue.number,
-              html_url: newIssue.html_url
-            };
+          token: ${{ secrets.GH_TOKEN }}
+          repository: Manastik-Tech/dementia-app-v2
+          title: ${{ needs.extract_issue.outputs.title }}
+          body: ${{ needs.extract_issue.outputs.body }}
+          labels: ${{ needs.extract_issue.outputs.labels }}
+          assignees: ${{ needs.extract_issue.outputs.assignee }}
 
-  update_public:
-    name: Update Public Issue
+  comment_and_close:
+    name: Comment, Label, and Close Original
     needs: [extract_issue, create_in_private]
     runs-on: ubuntu-latest
     steps:
-      - name: Comment, label, and close original issue
-        uses: actions/github-script@v7
+      - name: Comment on original issue
+        uses: peter-evans/create-or-update-comment@v4
         with:
-          github-token: ${{ secrets.GH_TOKEN }}
-          script: |
-            const issue_number = parseInt('${{ needs.extract_issue.outputs.number }}');
-            const assignee = '${{ needs.extract_issue.outputs.assignee }}';
-            const newIssueNumber = '${{ needs.create_in_private.outputs.number }}';
-            const newIssueUrl = '${{ needs.create_in_private.outputs.html_url }}';
+          token: ${{ secrets.GH_TOKEN }}
+          issue-number: ${{ needs.extract_issue.outputs.number }}
+          body: |
+            Assigned to ${{ needs.extract_issue.outputs.assignee }} - [Issue #${{ needs.create_in_private.outputs.issue-number }}](${{ needs.create_in_private.outputs.html-url }})
 
-            // Comment on original issue
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number,
-              body: `Assigned to ${assignee} - [Issue #${newIssueNumber}](${newIssueUrl})`
-            });
+      - name: Add "assigned" label
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          github_token: ${{ secrets.GH_TOKEN }}
+          labels: assigned
+          issue_number: ${{ needs.extract_issue.outputs.number }}
 
-            // Add "assigned" label
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number,
-              labels: ['assigned']
-            });
-
-            // Close the original issue
-            await github.rest.issues.update({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number,
-              state: 'closed'
-            });
+      - name: Close original issue
+        uses: peter-evans/close-issue@v2
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          issue-number: ${{ needs.extract_issue.outputs.number }}
