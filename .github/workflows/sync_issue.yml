@@ -1,49 +1,34 @@
 name: Sync Assigned Issue to Private Repo
+
 on:
   issues:
     types: [assigned]
+
 jobs:
   # Create the issue in the private repository
   create-private-issue:
     runs-on: ubuntu-latest
     outputs:
-      new_issue_number: ${{ fromJson(steps.create-issue.outputs.data).number }}
-      new_issue_url: ${{ fromJson(steps.create-issue.outputs.data).html_url }}
+      new_issue_number: ${{ steps.create-issue.outputs.issue-number }}
+      new_issue_url: ${{ steps.create-issue.outputs.issue-html-url }}
     
     steps:
-      - name: Get issue details
-        id: get-issue
-        uses: octokit/request-action@v2.x
-        with:
-          route: GET /repos/{owner}/{repo}/issues/{issue_number}
-          owner: Manastik-Tech
-          repo: Manastik-Teleneurorehab
-          issue_number: ${{ github.event.issue.number }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-      
-      - name: Extract label names
-        id: extract-labels
+      - name: Create issue body file
         run: |
-          LABELS=$(echo '${{ steps.get-issue.outputs.data }}' | jq -c '[.labels[].name]')
-          echo "ISSUE_LABELS=$LABELS" >> $GITHUB_OUTPUT
-          
-          ASSIGNEE=$(echo '${{ steps.get-issue.outputs.data }}' | jq -r '.assignee.login')
-          echo "ASSIGNEE_LOGIN=$ASSIGNEE" >> $GITHUB_OUTPUT
+          echo "${{ github.event.issue.body }}" > /tmp/issue-body.md
+          echo "" >> /tmp/issue-body.md
+          echo "_Copied from [Manastik-Tech/Manastik-Teleneurorehab#${{ github.event.issue.number }}](https://github.com/Manastik-Tech/Manastik-Teleneurorehab/issues/${{ github.event.issue.number }})_" >> /tmp/issue-body.md
       
       - name: Create issue in private repo
         id: create-issue
-        uses: octokit/request-action@v2.x
+        uses: peter-evans/create-issue-from-file@v4
         with:
-          route: POST /repos/{owner}/{repo}/issues
-          owner: Manastik-Tech
-          repo: dementia-app-v2
-          title: ${{ fromJson(steps.get-issue.outputs.data).title }}
-          body: ${{ toJSON(fromJson(steps.get-issue.outputs.data).body) }}${{ '\n\n_Copied from [Manastik-Tech/Manastik-Teleneurorehab#' }}${{ github.event.issue.number }}${{ '](https://github.com/Manastik-Tech/Manastik-Teleneurorehab/issues/' }}${{ github.event.issue.number }}${{ ')_' }}
-          labels: ${{ steps.extract-labels.outputs.ISSUE_LABELS }}
-          assignees: '["${{ steps.extract-labels.outputs.ASSIGNEE_LOGIN }}"]'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          token: ${{ secrets.GH_TOKEN }}
+          repository: Manastik-Tech/dementia-app-v2
+          title: ${{ github.event.issue.title }}
+          content-filepath: /tmp/issue-body.md
+          labels: ${{ join(github.event.issue.labels.*.name, ',') }}
+          assignees: ${{ github.event.issue.assignee.login }}
 
   # Update and close the original issue
   update-original-issue:
