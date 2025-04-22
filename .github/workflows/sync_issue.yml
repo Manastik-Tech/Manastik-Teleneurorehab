@@ -22,6 +22,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
       
+      - name: Extract label names
+        id: extract-labels
+        run: |
+          LABELS=$(echo '${{ steps.get-issue.outputs.data }}' | jq -c '[.labels[].name]')
+          echo "ISSUE_LABELS=$LABELS" >> $GITHUB_OUTPUT
+          
+          ASSIGNEE=$(echo '${{ steps.get-issue.outputs.data }}' | jq -r '.assignee.login')
+          echo "ASSIGNEE_LOGIN=$ASSIGNEE" >> $GITHUB_OUTPUT
+      
       - name: Create issue in private repo
         id: create-issue
         uses: octokit/request-action@v2.x
@@ -31,8 +40,8 @@ jobs:
           repo: dementia-app-v2
           title: ${{ fromJson(steps.get-issue.outputs.data).title }}
           body: ${{ toJSON(fromJson(steps.get-issue.outputs.data).body) }}${{ '\n\n_Copied from [Manastik-Tech/Manastik-Teleneurorehab#' }}${{ github.event.issue.number }}${{ '](https://github.com/Manastik-Tech/Manastik-Teleneurorehab/issues/' }}${{ github.event.issue.number }}${{ ')_' }}
-          labels: ${{ toJSON(fromJson(steps.get-issue.outputs.data).labels | map(attr='name')) }}
-          assignees: ${{ toJSON([fromJson(steps.get-issue.outputs.data).assignee.login]) }}
+          labels: ${{ steps.extract-labels.outputs.ISSUE_LABELS }}
+          assignees: '["${{ steps.extract-labels.outputs.ASSIGNEE_LOGIN }}"]'
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
