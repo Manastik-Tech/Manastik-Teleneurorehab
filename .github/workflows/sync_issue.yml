@@ -23,7 +23,7 @@ jobs:
         id: create-issue
         uses: peter-evans/create-issue-from-file@v4
         with:
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.GH_TOKEN }}
           repository: Manastik-Tech/dementia-app-v2
           title: ${{ github.event.issue.title }}
           content-filepath: /tmp/issue-body.md
@@ -39,7 +39,7 @@ jobs:
       - name: Comment on original issue
         uses: peter-evans/create-or-update-comment@v4
         with:
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.GH_TOKEN }}
           issue-number: ${{ github.event.issue.number }}
           body: "Assigned to ${{ github.event.issue.assignee.login }} - [Issue #${{ needs.create-private-issue.outputs.new_issue_number }}](${{ needs.create-private-issue.outputs.new_issue_url }})"
       
@@ -47,11 +47,11 @@ jobs:
         uses: andymckay/labeler@master
         with:
           add-labels: "assigned"
-          repo-token: ${{ secrets.GH_PAT }}
+          repo-token: ${{ secrets.GH_TOKEN }}
       
       - name: Close original issue
         uses: peter-evans/close-issue@v2
         with:
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.GH_TOKEN }}
           issue-number: ${{ github.event.issue.number }}
           comment: false
